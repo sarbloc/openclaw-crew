@@ -1,0 +1,307 @@
+// ~/.openclaw/openclaw.json
+// ═══════════════════════════════════════════════════════════
+// Token-optimized single-orchestrator + spawned sub-agents
+// Cooper = main agent, spawns TARS/Brand/Murph as needed
+// All models via OpenRouter (one key, one invoice)
+// Memory via Qdrant (entity-oriented, sub-linear scaling)
+// ═══════════════════════════════════════════════════════════
+{
+  // ─── Secrets ──────────────────────────────────────────
+  // All secrets loaded from env vars at runtime.
+  // Source: ~/.openclaw/.env (chmod 600, never committed to git)
+  secrets: {
+    providers: {
+      default: {
+        source: "env",
+        allowlist: [
+          "OPENROUTER_API_KEY",
+          "OPENCLAW_GATEWAY_TOKEN",
+          "OPENCLAW_HOOKS_TOKEN",
+          "TELEGRAM_BOT_TOKEN",
+          "GOG_KEYRING_PASSWORD",
+          "GOG_ACCOUNT",
+        ],
+      },
+    },
+  },
+
+  // ─── Models (all via OpenRouter) ──────────────────────
+  models: {
+    providers: {
+      openrouter: {
+        baseUrl: "https://openrouter.ai/api/v1",
+        apiKey: { source: "env", provider: "default", id: "OPENROUTER_API_KEY" },
+        models: [
+          // Cooper: conversations — frontier reasoning + strong tool use
+          {
+            id: "google/gemini-3.1-pro-preview",
+            name: "Gemini 3.1 Pro (Cooper)",
+            cost: { input: 2, output: 12 },
+            contextWindow: 1000000,
+            maxTokens: 65536,
+          },
+          // Cooper: heartbeat cron — cheap, fast, simple classification
+          {
+            id: "google/gemini-3.1-flash-lite",
+            name: "Gemini 3.1 Flash-Lite (heartbeat + Brand)",
+            cost: { input: 0.25, output: 1.50 },
+            contextWindow: 1000000,
+            maxTokens: 65536,
+          },
+          // TARS: coding — near-Opus SWE-Bench at 1/12th the price
+          {
+            id: "minimax/minimax-m2.5",
+            name: "MiniMax M2.5 (TARS)",
+            cost: { input: 0.30, output: 1.20 },
+            contextWindow: 200000,
+            maxTokens: 16384,
+          },
+          // Murph: creative writing — strong creative benchmarks, fast
+          {
+            id: "google/gemini-3-flash",
+            name: "Gemini 3 Flash (Murph)",
+            cost: { input: 0.50, output: 3.00 },
+            contextWindow: 1000000,
+            maxTokens: 65536,
+          },
+          // Fallback: reliable all-rounder if primary models fail
+          {
+            id: "anthropic/claude-sonnet-4-5",
+            name: "Claude Sonnet 4.5 (fallback)",
+            cost: { input: 3, output: 15 },
+            contextWindow: 200000,
+            maxTokens: 16384,
+          },
+        ],
+      },
+    },
+  },
+
+  // ─── Agents ───────────────────────────────────────────
+  agents: {
+    defaults: {
+      // Keep bootstrap files lean
+      bootstrapMaxChars: 6000,        // down from 20000 default
+      bootstrapTotalMaxChars: 20000,  // down from 150000 default
+
+      // Prevent openclaw configure/setup/doctor from overwriting workspace files
+      createBootstrapFiles: false,
+
+      // Prompt caching where supported
+      models: {
+        "openrouter/google/gemini-3.1-pro-preview": {
+          params: { cacheRetention: "long" },
+        },
+      },
+
+      // Sub-agent defaults
+      subagents: {
+        runTimeoutSeconds: 1800,      // 30 min — let agents finish real work
+        archiveAfterMinutes: 30,
+      },
+
+      // Context compaction
+      compaction: {
+        mode: "safeguard",
+      },
+
+      // Heartbeat DISABLED — using cron workaround instead
+      // (heartbeat.model override is bugged: issues #9556, #14279, #30894)
+      heartbeat: {
+        every: "0m",
+      },
+    },
+
+    list: [
+      // ── Cooper: Orchestrator (main agent) ─────────────
+      {
+        id: "cooper",
+        default: true,
+        name: "Cooper",
+        workspace: "~/.openclaw/workspace-cooper",
+        model: {
+          primary: "openrouter/google/gemini-3.1-pro-preview",
+          fallbacks: ["openrouter/anthropic/claude-sonnet-4-5"],
+        },
+        identity: {
+          name: "Cooper",
+          theme: "calm mission commander",
+          emoji: "🎯",
+        },
+        subagents: {
+          allowAgents: ["tars", "brand", "murph"],
+        },
+        tools: {
+          profile: "default",
+          allow: ["message", "memory_search", "memory_get"],
+        },
+      },
+
+      // ── TARS: Coding specialist (spawned only) ────────
+      {
+        id: "tars",
+        name: "TARS",
+        workspace: "~/.openclaw/workspace-tars",
+        model: {
+          primary: "openrouter/minimax/minimax-m2.5",
+          fallbacks: ["openrouter/anthropic/claude-sonnet-4-5"],
+        },
+        identity: {
+          name: "TARS",
+          theme: "precise engineer",
+          emoji: "🔧",
+        },
+        params: {
+          cacheRetention: "none",
+        },
+        tools: {
+          profile: "coding",
+          deny: ["message", "canvas"],
+        },
+        subagents: {
+          allowAgents: [],
+        },
+      },
+
+      // ── Brand: Comms specialist (spawned only) ────────
+      {
+        id: "brand",
+        name: "Brand",
+        workspace: "~/.openclaw/workspace-brand",
+        model: {
+          primary: "openrouter/google/gemini-3.1-flash-lite",
+          fallbacks: ["openrouter/anthropic/claude-sonnet-4-5"],
+        },
+        identity: {
+          name: "Brand",
+          theme: "efficient communicator",
+          emoji: "📧",
+        },
+        params: {
+          cacheRetention: "none",
+        },
+        tools: {
+          profile: "default",
+          allow: ["message", "read"],
+          deny: ["exec", "browser", "canvas"],
+        },
+        subagents: {
+          allowAgents: [],
+        },
+      },
+
+      // ── Murph: Social/content specialist (spawned only)
+      {
+        id: "murph",
+        name: "Murph",
+        workspace: "~/.openclaw/workspace-murph",
+        model: {
+          primary: "openrouter/google/gemini-3-flash",
+          fallbacks: ["openrouter/anthropic/claude-sonnet-4-5"],
+        },
+        identity: {
+          name: "Murph",
+          theme: "creative strategist",
+          emoji: "📱",
+        },
+        params: {
+          cacheRetention: "none",
+        },
+        tools: {
+          profile: "default",
+          allow: ["browser", "read", "write"],
+          deny: ["exec"],
+        },
+        subagents: {
+          allowAgents: [],
+        },
+      },
+    ],
+  },
+
+  // ─── Channel Bindings ─────────────────────────────────
+  // Everything routes to Cooper; he delegates via spawn
+  bindings: [
+    { agentId: "cooper", match: { channel: "telegram" } },
+    { agentId: "cooper", match: { channel: "whatsapp" } },
+  ],
+
+  // ─── Hooks (webhook for external task creation) ───────
+  hooks: {
+    enabled: true,
+    token: "${env:OPENCLAW_HOOKS_TOKEN}",
+    path: "/hooks",
+    mappings: [
+      {
+        match: { path: "task-created" },
+        action: "agent",
+        agentId: "cooper",
+        deliver: true,
+      },
+    ],
+  },
+
+  // ─── Gateway (network + security) ──────────────────────
+  gateway: {
+    // Bind to Tailscale interface only — not accessible from LAN or internet
+    // Even if someone is on your home network, they can't reach the gateway
+    // without being authenticated on your Tailscale network
+    bind: "tailnet",
+    // Auth token loaded from env (required for control UI access)
+    auth: {
+      token: "${env:OPENCLAW_GATEWAY_TOKEN}",
+    },
+  },
+
+  // ─── Session Management ───────────────────────────────
+  session: {
+    dmScope: "per-peer",
+    reset: {
+      mode: "daily",
+      atHour: 4,
+      idleMinutes: 120,
+    },
+  },
+
+  // ─── Skills ───────────────────────────────────────────
+  skills: {
+    entries: {
+      // Entity memory backed by Qdrant (custom skill)
+      "memory-qdrant": { enabled: true },
+      // Only enable skills you actually use — each adds ~24+ tokens/turn
+    },
+    load: {
+      extraDirs: ["~/.openclaw/skills-shared"],
+    },
+  },
+
+  // ─── Cron ─────────────────────────────────────────────
+  cron: {
+    enabled: true,
+    maxConcurrentRuns: 1,
+    sessionRetention: "12h",
+    runLog: {
+      maxBytes: "1mb",
+      keepLines: 500,
+    },
+    jobs: [
+      // Heartbeat replacement — cheap model, every 55m
+      // (workaround for bugged heartbeat.model override)
+      {
+        id: "heartbeat-check",
+        schedule: "*/55 * * * *",
+        agentId: "cooper",
+        model: "openrouter/google/gemini-3.1-flash-lite",
+        task: "Read HEARTBEAT.md. Run: memory extract --since 55m. Check tasks.json for tasks with status 'todo' — spawn agents for them. Check for sub-agent completions needing board updates. If nothing needs attention, reply HEARTBEAT_OK.",
+      },
+      // Weekly memory maintenance — expire old events, compact bloated entities
+      {
+        id: "memory-maintenance",
+        schedule: "0 2 * * 0",
+        agentId: "cooper",
+        model: "openrouter/google/gemini-3.1-flash-lite",
+        task: "Run: memory expire (garbage-collect expired events and facts). Then run: memory compact (trim entities with too many facts). Then run: memory stats and report if anything looks unusual.",
+      },
+    ],
+  },
+}

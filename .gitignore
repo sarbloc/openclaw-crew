@@ -1,0 +1,37 @@
+# ═══════════════════════════════════════════════════════════
+# OpenClaw Crew — Git Ignore
+# Keeps secrets, credentials, sessions, and runtime data
+# out of version control.
+# ═══════════════════════════════════════════════════════════
+
+# ─── Secrets (CRITICAL — never commit these) ─────────────
+.env
+*.env
+!.env.example
+secrets.json
+*.age
+*.gpg
+*.pem
+*.key
+
+# ─── OpenClaw credentials and session data ───────────────
+agents/
+sessions/
+credentials/
+auth-profiles.json
+models.json
+
+# ─── Runtime and logs ────────────────────────────────────
+logs/
+*.log
+*.jsonl
+cron/runs/
+sandboxes/
+
+# ─── Obsidian internal config (vault content IS tracked) ─
+workspace-cooper/vault/.obsidian/
+
+# ─── OS junk ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*~
