@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Resolve script directory (used to find workspace files to copy)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ═══════════════════════════════════════════════════════════
 # OpenClaw Crew — Deployment Bootstrap
 # Run this ONCE on a fresh machine before starting the gateway.
@@ -278,7 +281,6 @@ echo "   ✅ Workspaces created"
 # ─── 10. Copy workspace files (if provided) ──────────────
 echo ""
 echo "🔟  Workspace files..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 copy_if_missing() {
   local src="$1" dst="$2"
