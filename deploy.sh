@@ -156,17 +156,21 @@ if command -v memory &>/dev/null; then
   echo "   ✅ memory CLI found"
 else
   echo "   📦 Installing memory-qdrant..."
-  # Install from local path if available, otherwise from pip
+  # Ensure pipx is available (avoids PEP 668 externally-managed-environment error)
+  if ! command -v pipx &>/dev/null; then
+    echo "   📦 Installing pipx first..."
+    sudo apt-get install -y pipx
+    pipx ensurepath
+  fi
+  # Install from local path if available, otherwise from PyPI
   if [[ -d "$SCRIPT_DIR/memory-qdrant" ]]; then
-    pip install "$SCRIPT_DIR/memory-qdrant" --break-system-packages 2>/dev/null \
-      || pip install "$SCRIPT_DIR/memory-qdrant"
+    pipx install "$SCRIPT_DIR/memory-qdrant"
   else
-    pip install memory-qdrant --break-system-packages 2>/dev/null \
-      || pip install memory-qdrant
+    pipx install memory-qdrant || true
     # If package doesn't exist yet (skill not built), note it
     if ! command -v memory &>/dev/null; then
       echo "   ⚠️  memory-qdrant not yet published — build it first with Claude Code"
-      echo "   See MEMORY-SKILL-SPEC.md for the full build spec"
+      echo "   See MEMORY-SYSTEM-SPEC.md for the full build spec"
     fi
   fi
 fi
