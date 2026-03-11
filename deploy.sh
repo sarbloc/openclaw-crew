@@ -394,9 +394,46 @@ SERVICEEOF
   echo "   Start with: systemctl --user enable --now openclaw-gateway"
 fi
 
-# ─── 14. Verify environment ─────────────────────────────
+# ─── 14. Register cron jobs (via CLI) ─────────────────────
 echo ""
-echo "1️⃣4️⃣  Verification..."
+echo "1️⃣4️⃣  Registering cron jobs..."
+if command -v openclaw &>/dev/null; then
+  # Heartbeat replacement (every 55 min, cheap model)
+  if openclaw cron list 2>/dev/null | grep -q "heartbeat-check"; then
+    echo "   ⏭️  heartbeat-check already registered"
+  else
+    openclaw cron add \
+      --name "heartbeat-check" \
+      --cron "*/55 * * * *" \
+      --session isolated \
+      --agent cooper \
+      --model "openrouter/google/gemini-3.1-flash-lite" \
+      --message "Read HEARTBEAT.md. Run: memory extract --since 55m. Check tasks.json for tasks with status 'todo' — spawn agents for them. Check for sub-agent completions needing board updates. If nothing needs attention, reply HEARTBEAT_OK." \
+      && echo "   ✅ heartbeat-check cron registered" \
+      || echo "   ⚠️  Failed to register heartbeat-check cron"
+  fi
+
+  # Weekly memory maintenance (Sunday 2 AM)
+  if openclaw cron list 2>/dev/null | grep -q "memory-maintenance"; then
+    echo "   ⏭️  memory-maintenance already registered"
+  else
+    openclaw cron add \
+      --name "memory-maintenance" \
+      --cron "0 2 * * 0" \
+      --session isolated \
+      --agent cooper \
+      --model "openrouter/google/gemini-3.1-flash-lite" \
+      --message "Run: memory compact. Run: memory expire. Run: memory stats and report if anything looks unusual." \
+      && echo "   ✅ memory-maintenance cron registered" \
+      || echo "   ⚠️  Failed to register memory-maintenance cron"
+  fi
+else
+  echo "   ⚠️  OpenClaw not installed — skipping cron job registration"
+fi
+
+# ─── 15. Verify environment ─────────────────────────────
+echo ""
+echo "1️⃣5️⃣  Verification..."
 echo "   ─────────────────────────────────────"
 CHECKS_PASSED=0
 CHECKS_TOTAL=0
@@ -435,9 +472,9 @@ check ".gitignore exists" "test -f ~/.openclaw/.gitignore"
 echo "   ─────────────────────────────────────"
 echo "   $CHECKS_PASSED / $CHECKS_TOTAL checks passed"
 
-# ─── 15. Remaining manual steps ─────────────────────────
+# ─── 16. Remaining manual steps ─────────────────────────
 echo ""
-echo "1️⃣5️⃣  Manual steps remaining:"
+echo "1️⃣6️⃣  Manual steps remaining:"
 echo "   □ If Tailscale not yet connected: sudo tailscale up"
 echo "   □ Install Tailscale on your laptop/phone (same account)"
 echo "   □ Edit ~/.openclaw/.env with your real API keys and tokens"

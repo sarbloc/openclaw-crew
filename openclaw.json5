@@ -284,24 +284,8 @@
       maxBytes: "1mb",
       keepLines: 500,
     },
-    jobs: [
-      // Heartbeat replacement — cheap model, every 55m
-      // (workaround for bugged heartbeat.model override)
-      {
-        id: "heartbeat-check",
-        schedule: "*/55 * * * *",
-        agentId: "cooper",
-        model: "openrouter/google/gemini-3.1-flash-lite",
-        task: "Read HEARTBEAT.md. Run: memory extract --since 55m. Check tasks.json for tasks with status 'todo' — spawn agents for them. Check for sub-agent completions needing board updates. If nothing needs attention, reply HEARTBEAT_OK.",
-      },
-      // Weekly memory maintenance — expire old events, compact bloated entities
-      {
-        id: "memory-maintenance",
-        schedule: "0 2 * * 0",
-        agentId: "cooper",
-        model: "openrouter/google/gemini-3.1-flash-lite",
-        task: "Run: memory expire (garbage-collect expired events and facts). Then run: memory compact (trim entities with too many facts). Then run: memory stats and report if anything looks unusual.",
-      },
-    ],
+    // Jobs managed via CLI: openclaw cron add (not in config)
+    // - heartbeat-check: */55 * * * * (Flash-Lite, cooper)
+    // - memory-maintenance: 0 2 * * 0 (Flash-Lite, cooper)
   },
 }

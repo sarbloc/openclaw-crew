@@ -81,8 +81,32 @@ When storing a fact about an existing entity, the system:
 5. If facts exceed 20: compact by scoring frequency × recency, keep top 20
 
 ### Maintenance
-Weekly cron (Sunday 2 AM, Flash-Lite) runs `memory expire` + `memory compact`.
+Weekly cron (Sunday 2 AM, Flash-Lite) runs `memory compact` + `memory expire`.
 No daily consolidation needed — the upsert model handles it.
+
+Cron jobs are managed via the OpenClaw CLI (not in openclaw.json):
+```bash
+# List registered cron jobs
+openclaw cron list
+
+# Heartbeat replacement (every 55 min)
+openclaw cron add \
+  --name "heartbeat-check" \
+  --cron "*/55 * * * *" \
+  --session isolated \
+  --agent cooper \
+  --model "openrouter/google/gemini-3.1-flash-lite" \
+  --message "Read HEARTBEAT.md. Run: memory extract --since 55m. Check tasks.json for tasks with status 'todo' — spawn agents for them. Check for sub-agent completions needing board updates. If nothing needs attention, reply HEARTBEAT_OK."
+
+# Weekly memory maintenance (Sunday 2 AM)
+openclaw cron add \
+  --name "memory-maintenance" \
+  --cron "0 2 * * 0" \
+  --session isolated \
+  --agent cooper \
+  --model "openrouter/google/gemini-3.1-flash-lite" \
+  --message "Run: memory compact. Run: memory expire. Run: memory stats and report if anything looks unusual."
+```
 
 Full spec: see MEMORY-SKILL-SPEC.md
 
@@ -158,9 +182,10 @@ chmod +x deploy.sh
 The deploy script handles everything: installs Node.js, OpenClaw, Docker,
 Qdrant (container), memory-qdrant CLI, gog (Google Workspace), Tailscale,
 configures UFW firewall, creates all workspace directories, copies workspace
-files (without overwriting existing ones), and git-tracks every workspace for
-overwrite protection. It finishes with a verification checklist showing what's
-ready and what still needs manual setup.
+files (without overwriting existing ones), git-tracks every workspace for
+overwrite protection, and registers cron jobs via the OpenClaw CLI. It finishes
+with a verification checklist showing what's ready and what still needs manual
+setup.
 
 ### Prerequisites checklist
 

@@ -32,7 +32,8 @@ Memory: entity-based system backed by Qdrant (spec in MEMORY-SYSTEM-SPEC.md, not
 - **Heartbeat uses cron, not native heartbeat.** The `heartbeat.model` config override
   is bugged (GitHub issues #9556, #14279, #30894 — heartbeat always uses primary model
   regardless of override). Cron jobs correctly apply model overrides, so we use a cron
-  job on Flash-Lite as a workaround.
+  job on Flash-Lite as a workaround. Cron jobs are registered via the `openclaw cron add`
+  CLI (not in openclaw.json). The deploy script handles registration automatically.
 - **No MEMORY.md auto-injection.** Traditional OpenClaw setups inject MEMORY.md into
   every turn (costs tokens constantly). We use on-demand retrieval instead — currently
   via `memory` CLI backed by Qdrant (not yet built, see MEMORY-SYSTEM-SPEC.md).
@@ -95,6 +96,7 @@ Memory: entity-based system backed by Qdrant (spec in MEMORY-SYSTEM-SPEC.md, not
 11. Git-track all workspaces
 12. Secrets setup (.env from template, chmod 600, .gitignore)
 13. Systemd user service with EnvironmentFile
+14. Register cron jobs via `openclaw cron add` (heartbeat + memory maintenance)
 
 SCRIPT_DIR is defined at line 5 (top of script). `set -euo pipefail` means
 unbound variables are fatal — every variable must be defined before use.
