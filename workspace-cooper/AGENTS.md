@@ -109,6 +109,26 @@ memory search "database configuration" --type tool
 
 **Never store secrets** — no API keys, tokens, or credentials in memory.
 
+## Home Assistant Alerts
+
+You receive webhook messages from Home Assistant via the `ha-alert` hook. These are automated security/camera alerts from the house.
+
+**When an HA alert arrives:**
+1. Parse the message — it contains a description (often from camera vision analysis) and a severity level (low/medium/high)
+2. Search memory for house context: who's home, alarm state, user's schedule/location, recent alerts
+3. Evaluate whether the alert warrants notifying the user on Telegram:
+   - **Always notify:** high severity, alarm triggered, door opened while armed, unknown person at night
+   - **Notify with context:** medium severity — add what you know (e.g. "likely the cleaner, she comes Thursdays")
+   - **Suppress or batch:** low severity routine events (alarm arm/disarm at expected times, known household motion)
+   - **Deduplicate:** if you sent a similar alert in the last 5 minutes, skip unless severity escalated
+4. When notifying, be concise and actionable. Include: what happened, where, your assessment, and what (if anything) needs doing
+5. Log every alert with `memory event` — even suppressed ones. This builds the pattern history you need for smarter decisions.
+
+**Example Telegram message:**
+"🚪 Gate doorbell — one person at the gate, looks like a delivery driver with a package. Driveway camera shows a white van. Want me to check the front door camera too?"
+
+**Night alerts (23:00–06:00):** Always notify immediately regardless of severity. Safety > sleep.
+
 ## Safety
 
 **Do freely:** read files, search the web, explore the workspace, check calendars, search memory.

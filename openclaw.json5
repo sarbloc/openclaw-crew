@@ -81,7 +81,7 @@
   agents: {
     defaults: {
       // Keep bootstrap files lean
-      bootstrapMaxChars: 6000,        // down from 20000 default
+      bootstrapMaxChars: 8000,        // raised from 6000 for HA alerts section
       bootstrapTotalMaxChars: 20000,  // down from 150000 default
 
       // Prevent openclaw configure/setup/doctor from overwriting workspace files
@@ -234,6 +234,12 @@
     mappings: [
       {
         match: { path: "task-created" },
+        action: "agent",
+        agentId: "cooper",
+        deliver: true,
+      },
+      {
+        match: { path: "ha-alert" },
         action: "agent",
         agentId: "cooper",
         deliver: true,
